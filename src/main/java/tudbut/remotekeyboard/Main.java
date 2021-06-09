@@ -72,7 +72,7 @@ public class Main {
             public void keyPressed(KeyEvent keyEvent) {
                 for (int i = 0; i < keyboard.connections.size(); i++) {
                     try {
-                        keyboard.connections.get(i).writePacket(() -> String.valueOf(keyEvent.getKeyCode()));
+                        keyboard.connections.get(i).writePacket(() -> keyEvent.getKeyCode() + " 1");
                     }
                     catch (PBIC.PBICException.PBICWriteException e) {
                         e.printStackTrace();
@@ -84,7 +84,7 @@ public class Main {
             public void keyReleased(KeyEvent keyEvent) {
                 for (int i = 0; i < keyboard.connections.size(); i++) {
                     try {
-                        keyboard.connections.get(i).writePacket(() -> String.valueOf(keyEvent.getKeyCode()));
+                        keyboard.connections.get(i).writePacket(() -> keyEvent.getKeyCode() + " 0");
                     }
                     catch (PBIC.PBICException.PBICWriteException e) {
                         e.printStackTrace();
@@ -99,18 +99,47 @@ public class Main {
         String s = Tools.getStdInput().readLine();
         Robot robot = new Robot();
         client = new PBIC.Client(s, 52735);
-        boolean[] keys = new boolean[512];
+        boolean[] keys = new boolean[Character.MAX_VALUE];
         System.out.println("RUNNING!");
+        new Thread(() -> {
+            while (true) {
+                try {
+                    client.connection.writePacket(() -> "KEEPALIVE");
+                }
+                catch (PBIC.PBICException.PBICWriteException e) {
+                    e.printStackTrace();
+                }
+                try {
+                    Thread.sleep(2000);
+                }
+                catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
         while (true) {
-            PBIC.Packet packet = client.connection.readPacket();
-            int key = Integer.parseInt(packet.getContent());
-            boolean b = keys[key];
-            b = !b;
-            if(b)
-                robot.keyPress(key);
-            else
-                robot.keyRelease(key);
-            keys[key] = b;
+            try {
+                PBIC.Packet packet = client.connection.readPacket();
+                System.out.println(packet.getContent());
+                int key = Integer.parseInt(packet.getContent().split(" ")[0]);
+                boolean b = packet.getContent().split(" ")[1].equals("1");
+                try {
+                    if (b)
+                        robot.keyPress(key);
+                    else
+                        robot.keyRelease(key);
+                }
+                catch (Exception e) {
+                    try {
+                        System.out.println("Error processing key " + KeyEvent.getKeyText(key));
+                    }
+                    catch (Exception e1) {
+                        System.err.println("Invalid key " + key);
+                    }
+                }
+            } catch(ArrayIndexOutOfBoundsException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
